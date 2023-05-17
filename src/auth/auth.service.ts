@@ -1,26 +1,48 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaSerive } from 'src/prisma/prisma.service';
 import { AuthLoginDto } from './dto';
-import crypto from "crypto"
+import * as crypto from "crypto"
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime';
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaSerive) { }
+  constructor(private prisma: PrismaSerive) {}
 
-  async login(body: AuthLoginDto) { 
+  async signup(body: AuthLoginDto) {
+    const { email, password, first_name, last_name } = body
     //create the password hash
-    const hash = crypto.createHash("md5").update(body.password).digest('hex');
+    const hash = crypto.createHash('md5').update(password).digest('hex');
 
     //create the new user using the prisma
-    
+    try {
+      const user = await this.prisma.user.create({
+        data: {
+          email: email,
+          first_name,
+          last_name: last_name ? last_name : null,
+          password: hash,
+        },
+      });
 
-    //return the new user which has been created
-    return body
+      delete user.password
+
+      return user;
+    } catch (error) {
+      if (error instanceof PrismaClientKnownRequestError) { 
+        if (error.code == 'P2002') { 
+          throw new ForbiddenException({
+            message: 'Already a User!',
+          });
+        }
+      }
+
+      throw error
+    }   
   }
 
-  signup() {
+  login() {
     return {
-      message: 'I have signed up'
-    }
+      message: 'I have logged in',
+    };
   }
 }
